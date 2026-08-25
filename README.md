@@ -424,7 +424,9 @@ Always consult a qualified healthcare professional or registered dietitian befor
 ## 👤 Author
 
 **Mohd Izraan**
+
 B.C.A. — Bachelor of Computer Applications
+
 Artificial Intelligence Fundamentals Project
 
 ---
