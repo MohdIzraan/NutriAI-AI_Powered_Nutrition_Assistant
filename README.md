@@ -84,7 +84,7 @@ Make sure you have these installed:
 ---
 
 ## 📁 Project Structure
-
+```bash
 ai-nutrition-assistant/
 │
 ├── client/ React Frontend
@@ -144,7 +144,7 @@ ai-nutrition-assistant/
 │
 │
 └── docker-compose.yml Docker configuration
-
+```
 
 
 ---
@@ -181,6 +181,7 @@ cd ai-nutrition-assistant
 
 **Server — open `server/.env` and fill in your values:**
 
+```bash
 NODE_ENV=development
 PORT=5000
 MONGODB_URI=mongodb+srv://username:password@cluster0.xxxxx.mongodb.net/ai_nutrition?retryWrites=true&w=majority
@@ -189,10 +190,11 @@ JWT_EXPIRE=7d
 AI_SERVICE_URL=http://localhost:8000
 FRONTEND_URL=http://localhost:3000
 STORAGE_PROVIDER=local
-
+```
 
 **AI Service — open `ai-service/.env` and fill in your values:**
 
+```bash
 AI_MODE=production
 VISION_PROVIDER=gemini(or other any API key provider name)
 LLM_PROVIDER=gemini(or other any API key provider name)
@@ -202,7 +204,7 @@ GEMINI_CHAT_MODEL=gemini-3.6-flash
 PORT=8000
 HOST=0.0.0.0
 LOG_LEVEL=INFO
-
+```
 
 ---
 
@@ -246,9 +248,10 @@ python run.py
 
 Success message:
 
+```bash
 ✅ Gemini Provider ready — Vision: gemini-3.6-flash, Chat: gemini-3.6-flash
 INFO: Uvicorn running on http://0.0.0.0:8000
-
+```
 
 **Terminal 2 — Server:**
 ```bash
@@ -257,10 +260,10 @@ npm run dev
 ```
 
 Success message:
-
+```bash
 🚀 AI Nutrition Server running on port 5000
 MongoDB connected: cluster0.xxxxx.mongodb.net
-
+```
 
 **Terminal 3 — Client:**
 ```bash
@@ -282,8 +285,11 @@ Then open your browser and go to http://localhost:3000
 Every time you want to run the project:
 
 Terminal 1: cd ai-service → venv\Scripts\activate → python run.py
+
 Terminal 2: cd server → npm run dev
+
 Terminal 3: cd client → npm run dev
+
 Browser: http://localhost:3000
 
 
@@ -295,53 +301,71 @@ Browser: http://localhost:3000
 **Authentication**
 
 POST /api/auth/register Create new account
+
 POST /api/auth/login Login and get token
+
 GET /api/auth/me Get current logged in user
+
 POST /api/auth/logout Logout
 
 
 **Profile**
 
 GET /api/profile Get user profile
+
 PUT /api/profile Update user profile
 
 
 **Food Analysis**
 
 POST /api/food/analyze Upload food image for Gemini AI analysis
+
 GET /api/food/analysis/:id Get a previous analysis result
 
 
 **Meals**
 
 POST /api/meals Save a meal to history
+
 GET /api/meals List meals with filters and pagination
+
 GET /api/meals/:id Get one meal with full details
+
 DELETE /api/meals/:id Delete a meal
+
 GET /api/meals/today/summary Get today's total nutrition
 
 
 **Diet Plans**
 
 POST /api/diet/generate Generate a 7-day AI diet plan
+
 GET /api/diet List all plans
+
 GET /api/diet/active Get current active plan
+
 GET /api/diet/:id Get plan with all 7 days
+
 PUT /api/diet/:id/modify Modify plan using natural language
+
 DELETE /api/diet/:id Delete a plan
 
 
 **Chat**
 
 POST /api/chat Send message to Gemini AI
+
 GET /api/chat/history Get past chat conversations
+
 GET /api/chat/:id Get one full chat
 
 
 **Analytics**
 
 GET /api/analytics/summary Today's nutrition vs targets
+
 GET /api/analytics/weekly 7-day calorie and macro charts
+
 GET /api/analytics/recommendations Gemini wellness tips
 
 
@@ -353,7 +377,7 @@ Switch AI providers without changing any code.
 Just update `ai-service/.env`:
 
 | Setting | Value | Description | 
-|---|---|---|---|
+|---|---|---|
 | VISION_PROVIDER | gemini | Google Gemini Vision | 
 | VISION_PROVIDER | local | HuggingFace ViT Food101 | 
 | VISION_PROVIDER | openai | GPT-4o Vision | 
