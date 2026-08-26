@@ -1,102 +1,160 @@
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from './context/AuthContext';
-import AppLayout from './layouts/AppLayout';
-import AuthLayout from './layouts/AuthLayout';
-import { Spinner } from './components/ui';
+const express = require('express');
+const helmet = require('helmet');
+const cors = require('cors');
+const rateLimit = require('express-rate-limit');
+const morgan = require('morgan');
+const path = require('path');
+require('dotenv').config();
 
-// Pages
-import Landing         from './pages/Landing';
-import Login           from './pages/Login';
-import Register        from './pages/Register';
-import Dashboard       from './pages/Dashboard';
-import FoodRecognition from './pages/FoodRecognition';
-import MealAnalyzer    from './pages/MealAnalyzer';
-import DietPlanner     from './pages/DietPlanner';
-import DietPlanList    from './pages/DietPlanList';
-import DietPlanDetails from './pages/DietPlanDetails';
-import AIAssistant     from './pages/AIAssistant';
-import MealHistory     from './pages/MealHistory';
-import Analytics       from './pages/Analytics';
-import Profile         from './pages/Profile';
-import Settings        from './pages/Settings';
-import About           from './pages/About';
-import NotFound        from './pages/NotFound';
+const { errorMiddleware, notFoundMiddleware } = require('./middleware/error.middleware');
+const logger = require('./utils/logger');
 
-// Route Guards 
-function RequireAuth({ children }) {
-  const { user, loading, initialized } = useAuth();
-  const location = useLocation();
+// Route imports
+const authRoutes      = require('./routes/auth.routes');
+const profileRoutes   = require('./routes/profile.routes');
+const foodRoutes      = require('./routes/food.routes');
+const mealRoutes      = require('./routes/meal.routes');
+const dietRoutes      = require('./routes/diet.routes');
+const chatRoutes      = require('./routes/chat.routes');
+const analyticsRoutes = require('./routes/analytics.routes');
 
-  if (!initialized || loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-surface">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-10 w-10 bg-primary-600 rounded-xl flex items-center justify-center">
-            <span className="text-white font-bold text-sm">N</span>
-          </div>
-          <Spinner size="lg" className="text-primary-500" />
-          <p className="text-xs text-gray-400">Loading NutriAI…</p>
-        </div>
-      </div>
-    );
-  }
+const app = express();
 
-  if (!user) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
-  }
+// Security Headers 
+app.use(
+  helmet({
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  })
+);
 
-  return children;
-}
+// CORS 
+// Allow all Vercel URLs, localhost, and the configured frontend URL
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, Postman, curl)
+    if (!origin) {
+      return callback(null, true);
+    }
 
-function RequireGuest({ children }) {
-  const { user, initialized, loading } = useAuth();
+    // Allow all Vercel deployments for this project
+    if (origin.includes('vercel.app')) {
+      return callback(null, true);
+    }
 
-  if (!initialized || loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Spinner size="lg" className="text-primary-500" />
-      </div>
-    );
-  }
+    // Allow localhost for development
+    if (
+      origin.includes('localhost') ||
+      origin.includes('127.0.0.1')
+    ) {
+      return callback(null, true);
+    }
 
-  if (user) {
-    return <Navigate to="/dashboard" replace />;
-  }
+    // Allow the configured frontend URL
+    const allowedFrontend = process.env.FRONTEND_URL || '';
+    if (allowedFrontend && origin === allowedFrontend) {
+      return callback(null, true);
+    }
 
-  return children;
-}
+    // Allow Render URLs
+    if (origin.includes('onrender.com')) {
+      return callback(null, true);
+    }
 
-// App Routes 
-export default function App() {
-  return (
-    <Routes>
-      {/* Public landing */}
-      <Route path="/" element={<Landing />} />
+    // Block everything else
+    logger.warn(`CORS blocked: ${origin}`);
+    callback(new Error(`CORS: Origin ${origin} not allowed`));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
 
-      {/* Auth routes (redirect to dashboard if logged in) */}
-      <Route element={<RequireGuest><AuthLayout /></RequireGuest>}>
-        <Route path="/login"    element={<Login />} />
-        <Route path="/register" element={<Register />} />
-      </Route>
+app.use(cors(corsOptions));
 
-      {/* Protected app routes */}
-      <Route element={<RequireAuth><AppLayout /></RequireAuth>}>
-        <Route path="/dashboard"     element={<Dashboard />} />
-        <Route path="/food"          element={<FoodRecognition />} />
-        <Route path="/meal-analyzer" element={<MealAnalyzer />} />
-        <Route path="/diet"          element={<DietPlanList />} />
-        <Route path="/diet/new"      element={<DietPlanner />} />
-        <Route path="/diet/:id"      element={<DietPlanDetails />} />
-        <Route path="/assistant"     element={<AIAssistant />} />
-        <Route path="/history"       element={<MealHistory />} />
-        <Route path="/analytics"     element={<Analytics />} />
-        <Route path="/profile"       element={<Profile />} />
-        <Route path="/settings"      element={<Settings />} />
-        <Route path="/about"         element={<About />} />
-      </Route>
+// Handle preflight requests for all routes
+app.options('*', cors(corsOptions));
 
-      {/* 404 */}
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+// Rate Limiting 
+const generalLimiter = rateLimit({
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
+  max:      parseInt(process.env.RATE_LIMIT_MAX) || 200,
+  message: {
+    success: false,
+    message: 'Too many requests, please try again later.',
+    code:    'RATE_LIMIT_EXCEEDED',
+  },
+  standardHeaders: true,
+  legacyHeaders:   false,
+});
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max:      20,
+  message: {
+    success: false,
+    message: 'Too many authentication attempts. Please try again in 15 minutes.',
+    code:    'AUTH_RATE_LIMIT',
+  },
+});
+
+const aiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max:      10,
+  message: {
+    success: false,
+    message: 'Too many AI requests. Please wait a moment.',
+    code:    'AI_RATE_LIMIT',
+  },
+});
+
+app.use('/api/', generalLimiter);
+app.use('/api/auth/', authLimiter);
+app.use('/api/food/', aiLimiter);
+app.use('/api/diet/generate', aiLimiter);
+
+// Body Parsing 
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Request Logging 
+if (process.env.NODE_ENV !== 'test') {
+  app.use(
+    morgan('combined', {
+      stream: { write: (msg) => logger.http(msg.trim()) },
+    })
   );
 }
+
+// Static Files 
+app.use(
+  '/uploads',
+  express.static(path.join(process.cwd(), 'uploads'))
+);
+
+// Health Check 
+app.get('/health', (req, res) => {
+  res.json({
+    status:    'ok',
+    service:   'ai-nutrition-server',
+    timestamp: new Date().toISOString(),
+    env:       process.env.NODE_ENV,
+  });
+});
+
+// API Routes 
+app.use('/api/auth',      authRoutes);
+app.use('/api/profile',   profileRoutes);
+app.use('/api/food',      foodRoutes);
+app.use('/api/meals',     mealRoutes);
+app.use('/api/diet',      dietRoutes);
+app.use('/api/chat',      chatRoutes);
+app.use('/api/analytics', analyticsRoutes);
+
+// 404 Handler 
+app.use(notFoundMiddleware);
+
+// Global Error Handler 
+app.use(errorMiddleware);
+
+module.exports = app;
