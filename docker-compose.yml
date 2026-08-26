@@ -82,7 +82,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - VITE_API_URL=http://localhost:5000/api
+      - VITE_API_URL=http://nutriai-six-ebon.vercel.app/api
       - VITE_APP_NAME=NutriAI
     volumes:
       - ./client:/app
