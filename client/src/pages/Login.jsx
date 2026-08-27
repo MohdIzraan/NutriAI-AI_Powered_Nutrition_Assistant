@@ -33,7 +33,7 @@ export default function Login() {
       toast.success('Welcome back!');
       navigate(from, { replace: true });
     } catch (err) {
-      const msg = err.response?.data?.message || 'Login failed. Please try again.';
+      const msg = err.response?.data?.message || 'Please wait a moment — our server is waking up. This may take up to a minute on the free hosting plan. Then, please try again.';
       setServerError(msg);
     }
   };
