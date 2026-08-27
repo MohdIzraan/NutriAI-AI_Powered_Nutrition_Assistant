@@ -10,12 +10,12 @@ const { errorMiddleware, notFoundMiddleware } = require('./middleware/error.midd
 const logger = require('./utils/logger');
 
 // Route imports
-const authRoutes = require('./routes/auth.routes');
-const profileRoutes = require('./routes/profile.routes');
-const foodRoutes = require('./routes/food.routes');
-const mealRoutes = require('./routes/meal.routes');
-const dietRoutes = require('./routes/diet.routes');
-const chatRoutes = require('./routes/chat.routes');
+const authRoutes      = require('./routes/auth.routes');
+const profileRoutes   = require('./routes/profile.routes');
+const foodRoutes      = require('./routes/food.routes');
+const mealRoutes      = require('./routes/meal.routes');
+const dietRoutes      = require('./routes/diet.routes');
+const chatRoutes      = require('./routes/chat.routes');
 const analyticsRoutes = require('./routes/analytics.routes');
 
 const app = express();
@@ -29,56 +29,82 @@ app.use(
 );
 
 // CORS 
-const allowedOrigins = [
-  process.env.FRONTEND_URL || 'http://localhost:3000',
-  'http://localhost:5173',
-  'http://localhost:4173',
-];
+// Allow all Vercel URLs, localhost, and the configured frontend URL
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, Postman, curl)
+    if (!origin) {
+      return callback(null, true);
+    }
 
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin 
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
-      callback(new Error(`CORS: Origin ${origin} not allowed`));
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-  })
-);
+    // Allow all Vercel deployments for this project
+    if (origin.includes('vercel.app')) {
+      return callback(null, true);
+    }
+
+    // Allow localhost for development
+    if (
+      origin.includes('localhost') ||
+      origin.includes('127.0.0.1')
+    ) {
+      return callback(null, true);
+    }
+
+    // Allow the configured frontend URL
+    const allowedFrontend = process.env.FRONTEND_URL || '';
+    if (allowedFrontend && origin === allowedFrontend) {
+      return callback(null, true);
+    }
+
+    // Allow Render URLs
+    if (origin.includes('onrender.com')) {
+      return callback(null, true);
+    }
+
+    // Block everything else
+    logger.warn(`CORS blocked: ${origin}`);
+    callback(new Error(`CORS: Origin ${origin} not allowed`));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
+
+app.use(cors(corsOptions));
+
+// Handle preflight requests for all routes
+app.options('*', cors(corsOptions));
 
 // Rate Limiting 
 const generalLimiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
-  max: parseInt(process.env.RATE_LIMIT_MAX) || 200,
+  max:      parseInt(process.env.RATE_LIMIT_MAX) || 200,
   message: {
     success: false,
     message: 'Too many requests, please try again later.',
-    code: 'RATE_LIMIT_EXCEEDED',
+    code:    'RATE_LIMIT_EXCEEDED',
   },
   standardHeaders: true,
-  legacyHeaders: false,
+  legacyHeaders:   false,
 });
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20,
+  max:      20,
   message: {
     success: false,
     message: 'Too many authentication attempts. Please try again in 15 minutes.',
-    code: 'AUTH_RATE_LIMIT',
+    code:    'AUTH_RATE_LIMIT',
   },
 });
 
 const aiLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 10,
+  max:      10,
   message: {
     success: false,
     message: 'Too many AI requests. Please wait a moment.',
-    code: 'AI_RATE_LIMIT',
+    code:    'AI_RATE_LIMIT',
   },
 });
 
@@ -93,29 +119,36 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Request Logging 
 if (process.env.NODE_ENV !== 'test') {
-  app.use(morgan('combined', { stream: { write: (msg) => logger.http(msg.trim()) } }));
+  app.use(
+    morgan('combined', {
+      stream: { write: (msg) => logger.http(msg.trim()) },
+    })
+  );
 }
 
 // Static Files 
-app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+app.use(
+  '/uploads',
+  express.static(path.join(process.cwd(), 'uploads'))
+);
 
 // Health Check 
 app.get('/health', (req, res) => {
   res.json({
-    status: 'ok',
-    service: 'ai-nutrition-server',
+    status:    'ok',
+    service:   'ai-nutrition-server',
     timestamp: new Date().toISOString(),
-    env: process.env.NODE_ENV,
+    env:       process.env.NODE_ENV,
   });
 });
 
 // API Routes 
-app.use('/api/auth', authRoutes);
-app.use('/api/profile', profileRoutes);
-app.use('/api/food', foodRoutes);
-app.use('/api/meals', mealRoutes);
-app.use('/api/diet', dietRoutes);
-app.use('/api/chat', chatRoutes);
+app.use('/api/auth',      authRoutes);
+app.use('/api/profile',   profileRoutes);
+app.use('/api/food',      foodRoutes);
+app.use('/api/meals',     mealRoutes);
+app.use('/api/diet',      dietRoutes);
+app.use('/api/chat',      chatRoutes);
 app.use('/api/analytics', analyticsRoutes);
 
 // 404 Handler 
