@@ -7,13 +7,10 @@ const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
 
 const aiClient = axios.create({
   baseURL: AI_SERVICE_URL,
-  timeout: 300000, // 5 minutes for AI operations
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  timeout: 300000, // 5 minutes — handles Render free tier wake-up time
+  headers: { 'Content-Type': 'application/json' },
 });
 
-// Request interceptor for logging
 aiClient.interceptors.request.use(
   (config) => {
     logger.debug(`AI Service Request: ${config.method?.toUpperCase()} ${config.url}`);
@@ -22,51 +19,52 @@ aiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor for logging
 aiClient.interceptors.response.use(
   (response) => {
-    logger.debug(`AI Service Response: ${response.status} from ${response.config.url}`);
+    logger.debug(`AI Service Response: ${response.status}`);
     return response;
   },
   (error) => {
-    logger.error('AI Service Error:', error.response?.data || error.message);
+    logger.error('AI Service Error:', error.message);
     return Promise.reject(error);
   }
 );
 
-/**
- * Analyze food image using Python AI service
- * @param {string} imagePath - Path to local image file
- * @param {object} options - Analysis options
- */
+// Wake up the AI service before making a request
+// This is needed because Render free tier sleeps after 15 minutes
+const wakeUpAIService = async () => {
+  try {
+    await axios.get(`${AI_SERVICE_URL}/health`, { timeout: 60000 });
+    logger.debug('AI service is awake');
+  } catch {
+    logger.debug('AI service wake-up ping sent');
+  }
+};
+
 const analyzeFoodImage = async (imagePath, options = {}) => {
   try {
+    await wakeUpAIService();
     const formData = new FormData();
     formData.append('image', fs.createReadStream(imagePath));
     if (options.userId) formData.append('user_id', options.userId);
 
     const response = await aiClient.post('/ai/food/analyze', formData, {
-      headers: {
-        ...formData.getHeaders(),
-      },
+      headers: { ...formData.getHeaders() },
+      timeout: 300000,
     });
-
     return response.data;
   } catch (error) {
     logger.error('Food analysis error:', error.message);
     throw new Error(
-      error.response?.data?.detail || 'AI food analysis service is currently unavailable'
+      error.response?.data?.detail ||
+      'AI food analysis service is currently unavailable'
     );
   }
 };
 
-/**
- * Generate personalized diet plan
- * @param {object} profile - User profile data
- * @param {object} preferences - Diet preferences
- */
 const generateDietPlan = async (profile, preferences) => {
   try {
+    await wakeUpAIService();
     const response = await aiClient.post('/ai/diet/generate', {
       profile,
       preferences,
@@ -75,25 +73,15 @@ const generateDietPlan = async (profile, preferences) => {
   } catch (error) {
     logger.error('Diet generation error:', error.message);
     throw new Error(
-      error.response?.data?.detail || 'AI diet generation service is currently unavailable'
+      error.response?.data?.detail ||
+      'AI diet generation service is currently unavailable'
     );
   }
 };
 
-/**
- * Chat with AI nutrition assistant
- * @param {Array} messages - Conversation history
- * @param {object} context - User context (profile, current diet plan etc)
- */
 const chatWithAssistant = async (messages, context = {}) => {
   try {
-    // Wake up the AI service first if it is sleeping
-    try {
-      await axios.get(`${AI_SERVICE_URL}/health`, { timeout: 60000 });
-    } catch {
-      // If health check fails just continue and try anyway
-    }
-
+    await wakeUpAIService();
     const response = await aiClient.post('/ai/chat', {
       messages,
       context,
@@ -108,14 +96,9 @@ const chatWithAssistant = async (messages, context = {}) => {
   }
 };
 
-/**
- * Modify a diet plan using natural language
- * @param {object} currentPlan - Current diet plan
- * @param {string} instruction - Natural language modification instruction
- * @param {object} userProfile - User profile for context
- */
 const modifyDietPlan = async (currentPlan, instruction, userProfile) => {
   try {
+    await wakeUpAIService();
     const response = await aiClient.post('/ai/diet/modify', {
       current_plan: currentPlan,
       instruction,
@@ -125,18 +108,15 @@ const modifyDietPlan = async (currentPlan, instruction, userProfile) => {
   } catch (error) {
     logger.error('Diet modification error:', error.message);
     throw new Error(
-      error.response?.data?.detail || 'AI plan modification service is currently unavailable'
+      error.response?.data?.detail ||
+      'AI plan modification service is currently unavailable'
     );
   }
 };
 
-/**
- * Get AI recommendations based on user data
- * @param {object} userProfile - User profile
- * @param {Array} recentMeals - Recent meal history
- */
 const getRecommendations = async (userProfile, recentMeals = []) => {
   try {
+    await wakeUpAIService();
     const response = await aiClient.post('/ai/recommendations', {
       profile: userProfile,
       recent_meals: recentMeals,
@@ -145,16 +125,15 @@ const getRecommendations = async (userProfile, recentMeals = []) => {
   } catch (error) {
     logger.error('Recommendations error:', error.message);
     throw new Error(
-      error.response?.data?.detail || 'AI recommendations service is currently unavailable'
+      error.response?.data?.detail ||
+      'AI recommendations service is currently unavailable'
     );
   }
 };
 
-
-// Check AI service health
 const checkHealth = async () => {
   try {
-    const response = await aiClient.get('/health', { timeout: 5000 });
+    const response = await aiClient.get('/health', { timeout: 10000 });
     return { healthy: true, data: response.data };
   } catch (error) {
     return { healthy: false, error: error.message };
