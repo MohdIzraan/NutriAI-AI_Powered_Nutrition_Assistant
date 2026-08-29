@@ -7,7 +7,7 @@ const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
 
 const aiClient = axios.create({
   baseURL: AI_SERVICE_URL,
-  timeout: 120000, // 2 minutes for AI operations
+  timeout: 300000, // 5 minutes for AI operations
   headers: {
     'Content-Type': 'application/json',
   },
@@ -87,6 +87,13 @@ const generateDietPlan = async (profile, preferences) => {
  */
 const chatWithAssistant = async (messages, context = {}) => {
   try {
+    // Wake up the AI service first if it is sleeping
+    try {
+      await axios.get(`${AI_SERVICE_URL}/health`, { timeout: 60000 });
+    } catch {
+      // If health check fails just continue and try anyway
+    }
+
     const response = await aiClient.post('/ai/chat', {
       messages,
       context,
@@ -95,7 +102,8 @@ const chatWithAssistant = async (messages, context = {}) => {
   } catch (error) {
     logger.error('Chat error:', error.message);
     throw new Error(
-      error.response?.data?.detail || 'AI chat service is currently unavailable'
+      error.response?.data?.detail ||
+      'AI chat service is currently unavailable'
     );
   }
 };
