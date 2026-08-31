@@ -27,7 +27,7 @@ logger.add(
 )
 
 
-# Startup and Shutdown 
+# Startup and Shutdown
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("=" * 60)
@@ -38,11 +38,8 @@ async def lifespan(app: FastAPI):
     logger.info("=" * 60)
 
     if settings.is_demo():
-        logger.warning(
-            "⚠️  DEMO MODE: All AI responses are pre-configured "
-        )
+        logger.warning("⚠️  DEMO MODE: Using sample responses.")
 
-    # Pre-initialise providers to catch config errors early
     try:
         from app.core.providers import AIProviderFactory
         AIProviderFactory.get_vision_provider()
@@ -53,9 +50,37 @@ async def lifespan(app: FastAPI):
         if settings.is_production():
             raise
 
+    # Start keep-alive task in production
+    import asyncio
+    import httpx
+    import os
+
+    keep_alive_task = None
+
+    async def keep_alive():
+        """Ping self every 10 minutes to prevent Render free tier sleeping."""
+        port = int(os.environ.get("PORT", 8000))
+        url  = f"http://localhost:{port}/health"
+        while True:
+            await asyncio.sleep(10 * 60)  # Wait 10 minutes
+            try:
+                async with httpx.AsyncClient() as client:
+                    await client.get(url, timeout=10)
+                logger.debug("Self keep-alive ping sent")
+            except Exception:
+                logger.debug("Self keep-alive ping failed")
+
+    if settings.is_production():
+        keep_alive_task = asyncio.create_task(keep_alive())
+        logger.info("✅ Keep-alive task started")
+
     yield
 
+    if keep_alive_task:
+        keep_alive_task.cancel()
+
     logger.info("🛑 NutriAI AI Service shutting down")
+        
 
 
 # FastAPI App 
