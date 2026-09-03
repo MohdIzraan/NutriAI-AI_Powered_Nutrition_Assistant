@@ -2,6 +2,11 @@
 
 > Full-stack AI application demonstrating Computer Vision, Generative AI, NLP, and Personalization
 
+## 🚀 Live Demo
+
+🔗 **View the Project:**
+https://nutriai-six-ebon.vercel.app/
+
 ---
 
 ## 📌 Overview
