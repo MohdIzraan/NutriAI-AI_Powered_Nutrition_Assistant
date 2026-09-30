@@ -104,7 +104,7 @@ export default function AIAssistant() {
       setError(msg);
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: 'I apologize, I encountered an error. Please try again.',
+        content: 'I apologize, I encountered an error due to render free service my AI Assistant couldn\'t respond. Please try again in 2 - 3 minutes.',
         timestamp: new Date(),
       }]);
     } finally {
