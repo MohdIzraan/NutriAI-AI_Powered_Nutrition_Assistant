@@ -1,8 +1,3 @@
-"""
-NutriAI Python FastAPI Service
-AI-powered food recognition, diet planning, and nutrition analysis with Google Gemini support.
-"""
-
 import sys
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
@@ -27,7 +22,7 @@ logger.add(
 )
 
 
-# Startup and Shutdown
+# Startup and Shutdown 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("=" * 60)
@@ -38,7 +33,9 @@ async def lifespan(app: FastAPI):
     logger.info("=" * 60)
 
     if settings.is_demo():
-        logger.warning("⚠️  DEMO MODE: Using sample responses.")
+        logger.warning(
+            "⚠️  DEMO MODE: All AI responses are pre-configured samples."
+        )
 
     try:
         from app.core.providers import AIProviderFactory
@@ -50,67 +47,22 @@ async def lifespan(app: FastAPI):
         if settings.is_production():
             raise
 
-    # Start keep-alive task in production
-    import asyncio
-    import httpx
-    import os
-
-    keep_alive_task = None
-
-    async def keep_alive():
-        """Ping self every 10 minutes to prevent Render free tier sleeping."""
-        port = int(os.environ.get("PORT", 8000))
-        url  = f"http://localhost:{port}/health"
-        while True:
-            await asyncio.sleep(10 * 60)  # Wait 10 minutes
-            try:
-                async with httpx.AsyncClient() as client:
-                    await client.get(url, timeout=10)
-                logger.debug("Self keep-alive ping sent")
-            except Exception:
-                logger.debug("Self keep-alive ping failed")
-
-    if settings.is_production():
-        keep_alive_task = asyncio.create_task(keep_alive())
-        logger.info("✅ Keep-alive task started")
-
     yield
 
-    if keep_alive_task:
-        keep_alive_task.cancel()
-
     logger.info("🛑 NutriAI AI Service shutting down")
-        
 
 
 # FastAPI App 
 app = FastAPI(
     title="NutriAI — AI Service",
-    description="""
-## NutriAI Python AI Service
-
-Provides AI-powered:
-- **Food Recognition** — Computer vision analysis of food images
-- **Diet Planning** — Personalised 7-day regional diet plans
-- **Chat** — AI nutrition assistant
-- **Recommendations** — Personalised wellness suggestions
-
-### Supported AI Providers
-- `gemini`    — Google Gemini 1.5 Flash (FREE)
-- `demo`      — Development mode (no API keys needed)
-- `local`     — HuggingFace ViT Food101 model (FREE, offline)
-- `openai`    — GPT-4o Vision (paid)
-- `anthropic` — Claude 3.5 Vision (paid)
-
-Configure via environment variables in ai-service/.env
-    """,
+    description="AI-powered food recognition and diet planning.",
     version="1.0.0",
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
 )
 
-# CORS 
+# CORS Middleware 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -124,27 +76,14 @@ app.add_middleware(
 )
 
 # Routes 
-app.include_router(
-    food.router,
-    prefix="/ai/food",
-    tags=["Food Recognition"],
-)
-app.include_router(
-    diet.router,
-    prefix="/ai/diet",
-    tags=["Diet Planning"],
-)
-app.include_router(
-    chat.router,
-    prefix="/ai",
-    tags=["Chat & Recommendations"],
-)
+app.include_router(food.router, prefix="/ai/food", tags=["Food Recognition"])
+app.include_router(diet.router, prefix="/ai/diet", tags=["Diet Planning"])
+app.include_router(chat.router, prefix="/ai",      tags=["Chat & Recommendations"])
 
 
 # Health Check 
 @app.get("/health", tags=["Health"])
 async def health_check():
-    """Service health check."""
     return {
         "status":          "healthy",
         "service":         "nutriai-ai-service",
