@@ -9,4 +9,5 @@ if __name__ == "__main__":
         port=port,
         reload=False,
         workers=1,
+        timeout_keep_alive=30,
     )

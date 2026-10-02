@@ -33,19 +33,19 @@ async def lifespan(app: FastAPI):
     logger.info("=" * 60)
 
     if settings.is_demo():
-        logger.warning(
-            "⚠️  DEMO MODE: All AI responses are pre-configured samples."
-        )
+        logger.warning("⚠️  DEMO MODE: Using sample responses.")
 
+    # Provider Initialisation 
     try:
         from app.core.providers import AIProviderFactory
         AIProviderFactory.get_vision_provider()
         AIProviderFactory.get_llm_provider()
         logger.info("✅ AI providers initialised successfully")
     except Exception as e:
-        logger.error(f"⛔ Provider initialisation failed: {e}")
-        if settings.is_production():
-            raise
+        logger.warning(
+            f"⚠️  Provider pre-initialisation failed: {e}. "
+            f"Will retry on first request."
+        )
 
     yield
 
@@ -62,23 +62,31 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# CORS Middleware 
+# CORS 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5000",
-        "http://localhost:3000",
-        "http://localhost:5173",
-    ],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # Routes 
-app.include_router(food.router, prefix="/ai/food", tags=["Food Recognition"])
-app.include_router(diet.router, prefix="/ai/diet", tags=["Diet Planning"])
-app.include_router(chat.router, prefix="/ai",      tags=["Chat & Recommendations"])
+app.include_router(
+    food.router,
+    prefix="/ai/food",
+    tags=["Food Recognition"],
+)
+app.include_router(
+    diet.router,
+    prefix="/ai/diet",
+    tags=["Diet Planning"],
+)
+app.include_router(
+    chat.router,
+    prefix="/ai",
+    tags=["Chat & Recommendations"],
+)
 
 
 # Health Check 
