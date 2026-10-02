@@ -25,27 +25,16 @@ logger.add(
 # Startup and Shutdown 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Start instantly 
+    # Gemini is initialized lazily on first real request
     logger.info("=" * 60)
     logger.info("🤖 NutriAI Python AI Service Starting")
     logger.info(f"   AI Mode:         {settings.AI_MODE.upper()}")
     logger.info(f"   Vision Provider: {settings.VISION_PROVIDER}")
     logger.info(f"   LLM Provider:    {settings.LLM_PROVIDER}")
+    logger.info("   Providers:       Lazy init on first request")
     logger.info("=" * 60)
-
-    if settings.is_demo():
-        logger.warning("⚠️  DEMO MODE: Using sample responses.")
-
-    # Provider Initialisation 
-    try:
-        from app.core.providers import AIProviderFactory
-        AIProviderFactory.get_vision_provider()
-        AIProviderFactory.get_llm_provider()
-        logger.info("✅ AI providers initialised successfully")
-    except Exception as e:
-        logger.warning(
-            f"⚠️  Provider pre-initialisation failed: {e}. "
-            f"Will retry on first request."
-        )
+    logger.info("✅ Service started instantly — ready for requests")
 
     yield
 
@@ -89,15 +78,15 @@ app.include_router(
 )
 
 
-# Health Check 
+# Health Check
 @app.get("/health", tags=["Health"])
 async def health_check():
     return {
         "status":          "healthy",
         "service":         "nutriai-ai-service",
         "ai_mode":         settings.AI_MODE,
-        "vision_provider": settings.get_vision_provider(),
-        "llm_provider":    settings.get_llm_provider(),
+        "vision_provider": settings.VISION_PROVIDER,
+        "llm_provider":    settings.LLM_PROVIDER,
         "is_demo":         settings.is_demo(),
     }
 
